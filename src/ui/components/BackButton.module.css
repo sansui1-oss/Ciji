@@ -26,3 +26,13 @@
   border-bottom: 1.6px solid currentColor;
   transform: rotate(45deg);
 }
+
+/* ── 液态玻璃 ─────────────────────────────────────────────
+   返回键变成一颗 32px 的磨砂玻璃圆钮，尺寸不变，只多一层玻璃底。 */
+
+:global([data-glass='true']) .back {
+  background: var(--glass-card);
+  border: 1px solid var(--glass-edge);
+  border-radius: 50%;
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}

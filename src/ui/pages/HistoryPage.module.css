@@ -216,3 +216,23 @@
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
+
+/* ── 液态玻璃 ─────────────────────────────────────────────
+   日期行是纸面卡片，只描玻璃边 + 高光；展开的明细留在卡片里面，
+   比例条和数字都不动。 */
+
+:global([data-glass='true']) .item {
+  margin-bottom: 8px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+:global([data-glass='true']) .head {
+  padding: 14px;
+}
+
+:global([data-glass='true']) .detail {
+  padding: 4px 14px 20px;
+}

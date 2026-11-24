@@ -380,3 +380,75 @@
   font-size: var(--fs-sm);
   color: var(--ink-3);
 }
+
+/* ── 液态玻璃 ─────────────────────────────────────────────
+   底部弹层是整块磨砂玻璃（regularMaterial 的 CSS 等价物）：遮罩先把
+   后面的页面轻轻磨糊一层，弹层本身半透明 + blur(20px) saturate(180%)，
+   圆角放大到 20px。弹层里的小标签、小按钮是磨砂胶囊；
+   备选释义那行是纸面卡片，只描玻璃边。 */
+
+/* 遮罩：把后面的页面轻轻磨糊一层，弹层升起时底下是柔的 */
+:global([data-glass='true']) .mask {
+  -webkit-backdrop-filter: blur(6px) saturate(130%);
+  backdrop-filter: blur(6px) saturate(130%);
+}
+
+/* 弹层本体：磨砂玻璃 */
+:global([data-glass='true']) .sheet {
+  background: var(--glass-sheet);
+  border: 1px solid var(--glass-edge);
+  border-bottom: 0;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 -8px 32px rgba(0, 0, 0, 0.16);
+}
+
+/* 高亮开关 / 同族变形 / 切换胶囊 / 入口按钮：磨砂胶囊 */
+:global([data-glass='true']) .mark,
+:global([data-glass='true']) .form,
+:global([data-glass='true']) .viewChip,
+:global([data-glass='true']) .entryBtn {
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: var(--glass-card);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+/* 高亮开着时还是荧光笔底色，别被玻璃盖掉 */
+:global([data-glass='true']) .mark[data-on='true'] {
+  background: var(--mark);
+}
+
+/* 墨墨加入按钮：磨砂胶囊 */
+:global([data-glass='true']) .memoButton {
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: var(--glass-card);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+/* AI 小标记：磨砂胶囊 */
+:global([data-glass='true']) .aiTag {
+  border-radius: 999px;
+  background: var(--glass-bubble);
+}
+
+/* 备选释义行：纸面卡片，只描玻璃边 + 高光 */
+:global([data-glass='true']) .altRow {
+  border: 1px solid var(--glass-edge);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+/* 自定义释义输入框：半透明玻璃底 + 玻璃边 */
+:global([data-glass='true']) .editorInput {
+  border: 1px solid var(--glass-edge);
+  border-radius: 12px;
+  background: var(--glass-card);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}

@@ -149,3 +149,37 @@
   font-size: var(--fs-xs);
   color: var(--ink-3);
 }
+
+/* ── 液态玻璃 ─────────────────────────────────────────────
+   吸顶标题是悬浮磨砂胶囊；文章行是纸面卡片，只描玻璃边 + 高光。
+   当前那篇的蓝色竖线收进卡片里，不戳出边框。 */
+
+/* 吸顶标题：悬浮磨砂胶囊 */
+:global([data-glass='true']) .header {
+  margin-left: -8px;
+  margin-right: -8px;
+  padding: var(--sp-2) 16px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-card-shadow);
+}
+
+/* 文章行：纸面卡片，只描玻璃边 + 高光 */
+:global([data-glass='true']) .row {
+  margin-bottom: 8px;
+  padding: 0 14px;
+  overflow: hidden;
+  border: 1px solid var(--glass-edge);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+:global([data-glass='true']) .row[data-current='true']::before {
+  left: 0;
+}

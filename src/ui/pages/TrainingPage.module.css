@@ -266,3 +266,63 @@
   line-height: 1.1;
   letter-spacing: -0.02em;
 }
+
+/* ── 液态玻璃 ─────────────────────────────────────────────
+   档位条是悬浮磨砂胶囊（套卷列表从下面滚过）；套卷行与篇目行是纸面
+   卡片，只描玻璃边 + 高光，不做半透明填充、不加模糊。 */
+
+/* 吸顶档位条：悬浮磨砂胶囊，贴住时不再画 1px 分隔线 */
+:global([data-glass='true']) .levelBar {
+  margin-left: -8px;
+  margin-right: -8px;
+  padding: 4px 8px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-card-shadow);
+}
+
+:global([data-glass='true']) .levelBar[data-stuck='true'] {
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-card-shadow);
+}
+
+/* 档位条里的分段控件：已经在玻璃胶囊里面了，自己不再套一层玻璃，
+   边框和底色都去掉，当前档是一颗磨砂气泡 */
+:global([data-glass='true']) .levelBar .segments {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  overflow: visible;
+}
+
+:global([data-glass='true']) .segment {
+  border-right: 0;
+  border-radius: 999px;
+  margin: 2px;
+}
+
+:global([data-glass='true']) .segment[data-on='true'] {
+  background: var(--glass-bubble);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+/* 套卷行 / 篇目行：纸面卡片，只描玻璃边 + 高光 */
+:global([data-glass='true']) .paperRow,
+:global([data-glass='true']) .passageRow {
+  margin-bottom: 8px;
+  padding: 13px 14px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}

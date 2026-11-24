@@ -102,3 +102,18 @@
 .row[data-interactive='true']:active {
   background: var(--tint);
 }
+
+/* ── 液态玻璃 ─────────────────────────────────────────────
+   单词行是纸面卡片，只描玻璃边 + 顶部高光，不做半透明填充、不加模糊
+   （底下是纯平纸面，模糊磨不到东西，只费性能）。
+   overflow: hidden 让左侧那条 2px 状态线收进圆角卡片里，不戳出边框。 */
+
+:global([data-glass='true']) .row {
+  margin-bottom: 8px;
+  padding: 12px 14px 13px;
+  overflow: hidden;
+  border: 1px solid var(--glass-edge);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}

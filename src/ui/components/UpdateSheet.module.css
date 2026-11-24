@@ -137,3 +137,42 @@
     opacity: 0;
   }
 }
+
+/* ── 液态玻璃 ─────────────────────────────────────────────
+   与词卡弹层同一副玻璃：遮罩轻磨糊，弹层是磨砂玻璃，更新日志是
+   纸面卡片，只描玻璃边；主按钮是磨砂胶囊。 */
+
+:global([data-glass='true']) .mask {
+  -webkit-backdrop-filter: blur(6px) saturate(130%);
+  backdrop-filter: blur(6px) saturate(130%);
+}
+
+:global([data-glass='true']) .sheet {
+  background: var(--glass-sheet);
+  border: 1px solid var(--glass-edge);
+  border-bottom: 0;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 -8px 32px rgba(0, 0, 0, 0.16);
+}
+
+:global([data-glass='true']) .notes {
+  border: 1px solid var(--glass-edge);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+:global([data-glass='true']) .primary {
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: var(--glass-button);
+  color: var(--ink);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-card-shadow);
+}

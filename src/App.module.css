@@ -5,6 +5,15 @@
   background: var(--paper);
 }
 
+/* 玻璃模式：页面底铺一层很淡的青绿 / 天青晕（只在顶部往下淡出）。
+   .app 本身不滚动，晕是固定的，内容从玻璃条下面滚过时才有折射感。
+   玻璃关掉就回到干净纸面。 */
+.app[data-glass='true'] {
+  background:
+    var(--wash),
+    var(--paper);
+}
+
 .body {
   flex: 1;
   overflow-y: auto;
@@ -33,6 +42,13 @@
   margin-bottom: calc(-1 * var(--safe-top));
   background: var(--paper);
   pointer-events: none;
+}
+
+/* 玻璃模式：状态栏那条缝也磨砂化，吸顶栏贴住时上下是一整块玻璃 */
+.app[data-glass='true'] .body::before {
+  background: var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
 }
 
 /* 栏目容器：去过的页面一直挂着（保住状态），没轮到的 display:none */
@@ -76,4 +92,17 @@
     opacity: 0;
     transform: translate(-50%, 6px);
   }
+}
+
+/* 玻璃模式：提示条也变成悬浮磨砂胶囊 */
+.app[data-glass='true'] .toast {
+  background: var(--glass-sheet);
+  color: var(--ink);
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-card-shadow);
 }

@@ -288,3 +288,52 @@
   font-variant-numeric: tabular-nums;
   line-height: 1.6;
 }
+
+/* ── 液态玻璃 ─────────────────────────────────────────────
+   只玻璃化「浮在内容上的东西」：吸顶的分组标题是悬浮胶囊（内容从下面
+   滚过、透出模糊的底），主按钮是磨砂胶囊；提示条是纸面卡片，只描一道
+   玻璃边 + 顶部高光。开关在 html 祖先的 [data-glass] 上，见 App.tsx。 */
+
+/* 吸顶分组标题：悬浮磨砂胶囊。左右各往外扩 8px 伸进页边，胶囊贴住时
+   不再画那条 1px 分隔线（胶囊自己的边和影子就是分界） */
+:global([data-glass='true']) .groupHead {
+  margin-left: -8px;
+  margin-right: -8px;
+  padding: var(--sp-2) 16px calc(var(--sp-2) + 1px);
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-card-shadow);
+}
+
+:global([data-glass='true']) .groupHead[data-stuck='true'] {
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-card-shadow);
+}
+
+/* 主按钮：磨砂胶囊。按钮在文档流里、没有内容从它下面滚过，
+   模糊没有东西可磨，只留半透明填充 + 玻璃边 + 高光 */
+:global([data-glass='true']) .button {
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: var(--glass-button);
+  color: var(--ink);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-card-shadow);
+}
+
+/* 提示条：纸面卡片，只描玻璃边 + 高光，左边那条状态色竖线保留 */
+:global([data-glass='true']) .warning,
+:global([data-glass='true']) .retryWarn,
+:global([data-glass='true']) .retryDetail {
+  border: 1px solid var(--glass-edge);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}

@@ -463,6 +463,92 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ── 液态玻璃 ─────────────────────────────────────────────
+   吸顶标题是悬浮磨砂胶囊；日期 / 类型是磨砂胶囊（选中的还是实心主色，
+   一眼能分清）；词行是纸面卡片，只描玻璃边；主按钮是磨砂胶囊。 */
+
+/* 吸顶标题：悬浮磨砂胶囊 */
+:global([data-glass='true']) .header {
+  margin-left: -8px;
+  margin-right: -8px;
+  padding: var(--sp-2) 16px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-card-shadow);
+}
+
+/* 日期 / 类型：磨砂胶囊 */
+:global([data-glass='true']) .day,
+:global([data-glass='true']) .kind {
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: var(--glass-card);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+/* 选中的还是实心主色，别被玻璃盖掉 */
+:global([data-glass='true']) .day[data-on='true'],
+:global([data-glass='true']) .kind[data-on='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  box-shadow: none;
+}
+
+/* 分段控件：磨砂胶囊，当前项是磨砂气泡 */
+:global([data-glass='true']) .segments {
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: var(--glass-card);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+:global([data-glass='true']) .segment {
+  border-right: 0;
+  border-radius: 999px;
+  margin: 2px;
+}
+
+:global([data-glass='true']) .segment[data-on='true'] {
+  background: var(--glass-bubble);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+/* 词行：纸面卡片，只描玻璃边 + 高光 */
+:global([data-glass='true']) .word {
+  margin-bottom: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+/* 错误提示：纸面卡片，只描玻璃边 + 高光 */
+:global([data-glass='true']) .error {
+  border: 1px solid var(--glass-edge);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+/* 主按钮：磨砂胶囊 */
+:global([data-glass='true']) .primary {
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: var(--glass-button);
+  color: var(--ink);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-card-shadow);
+}
+
 /* ── 生成进度：三步 + 秒表 ──────────────────
    只表示"走到哪一步"，不画百分比：每步真实耗时 20~90 秒都在变，进度条只会骗人 */
 .progress {

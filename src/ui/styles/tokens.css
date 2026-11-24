@@ -37,15 +37,33 @@
   --scrim: rgba(18, 20, 19, 0.22);
   --selection: #d9e4d0;
 
-  /* 液态玻璃（底栏开关，见 store/glass.ts）。
-     alpha 由设置里的滑杆实时覆盖（挂在 html 的内联样式上） */
+  /* 液态玻璃（开关见 store/glass.ts，默认开）。
+     regularMaterial 的 CSS 等价物：半透明填充 + blur(20px) saturate(180%)
+     + 顶部 1px 内高光 + 很轻的投影。
+     --glass-alpha 由设置里的滑杆实时覆盖（挂在 html 的内联样式上），
+     只管 --glass-fill（底栏 / 吸顶栏）；卡片、弹窗、按钮用固定不透明度，
+     滑杆拉到 0 时正文不能跟着变透明。
+     只有「浮在内容上的东西」才用玻璃填充（栏、弹窗、答题条、胶囊）；
+     沉在页面里的列表卡片保持纸面，只拿 --glass-edge / --glass-highlight
+     描一道玻璃边。 */
   --glass-tint: 255 255 255;
   --glass-alpha: 0.55;
   --glass-fill: rgb(var(--glass-tint) / var(--glass-alpha));
+  --glass-card: rgb(var(--glass-tint) / 0.62);
+  --glass-sheet: rgb(var(--glass-tint) / 0.78);
+  --glass-button: rgb(255 255 255 / 0.75);
   --glass-edge: rgba(255, 255, 255, 0.65);
   --glass-highlight: rgba(255, 255, 255, 0.55);
   --glass-bubble: rgba(255, 255, 255, 0.78);
   --glass-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+  --glass-card-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --glass-filter: blur(20px) saturate(180%);
+
+  /* 页面底的淡色晕：玻璃要有东西可透才看得出是玻璃。
+     只晕在顶部 400px 左右往下淡出，正文区不另加底色、不动纸面 */
+  --wash:
+    radial-gradient(120% 480px at 50% -120px, rgba(140, 200, 175, 0.3), rgba(140, 200, 175, 0) 70%),
+    radial-gradient(90% 360px at 88% -60px, rgba(140, 185, 220, 0.22), rgba(140, 185, 220, 0) 70%);
 
   /* 字体 */
   --font-word: 'Spectral', Georgia, 'Songti SC', 'Noto Serif CJK SC', serif;
@@ -115,12 +133,24 @@
   --scrim: rgba(0, 0, 0, 0.66);
   --selection: #2f4034;
 
-  /* 液态玻璃（底栏开关，见 store/glass.ts） */
+  /* 液态玻璃（开关见 store/glass.ts，默认开）。
+     深色底上玻璃填充要更透一点才看得出层次，但按钮得比卡片更亮，
+     否则深色玻璃条上的按钮会跟条子糊成一片 */
   --glass-tint: 28 31 30;
   --glass-alpha: 0.52;
   --glass-fill: rgb(var(--glass-tint) / var(--glass-alpha));
+  --glass-card: rgb(var(--glass-tint) / 0.62);
+  --glass-sheet: rgb(var(--glass-tint) / 0.8);
+  --glass-button: rgb(92 98 96 / 0.75);
   --glass-edge: rgba(255, 255, 255, 0.14);
   --glass-highlight: rgba(255, 255, 255, 0.12);
   --glass-bubble: rgba(255, 255, 255, 0.1);
   --glass-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --glass-card-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --glass-filter: blur(20px) saturate(180%);
+
+  /* 深色底的淡色晕：比浅色再压一半亮度，别让顶部发灰 */
+  --wash:
+    radial-gradient(120% 480px at 50% -120px, rgba(90, 160, 140, 0.18), rgba(90, 160, 140, 0) 70%),
+    radial-gradient(90% 360px at 88% -60px, rgba(90, 130, 180, 0.14), rgba(90, 130, 180, 0) 70%);
 }

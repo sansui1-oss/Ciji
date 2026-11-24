@@ -2,13 +2,16 @@ import { Preferences } from '@capacitor/preferences'
 import { create } from 'zustand'
 
 /**
- * 液态玻璃底栏（默认关）+ 玻璃不透明度滑杆。
+ * 液态玻璃（默认开）+ 玻璃不透明度滑杆。
  *
- * 开着时 TabBar 变成悬浮胶囊：backdrop-filter 模糊 + 提饱和，
- * 内容从栏下滚过透出玻璃质感。样式见 TabBar.module.css 的 data-glass 分支。
+ * 开着时整个界面走玻璃：底栏是悬浮胶囊，吸顶的顶栏、答题条、弹窗、
+ * 主要按钮也都变成磨砂玻璃面，内容从下面滚过透出模糊的质感。
+ * 各处的 data-glass 分支见 TabBar.module.css 与各页面的 CSS module。
  *
+ * 没存过偏好的用户默认开；存过「关」的用户保持关，不强制覆盖。
  * 不透明度走 CSS 变量 --glass-alpha（tokens.css 里按主题给了默认值），
  * 滑杆把覆盖值挂在 <html> 的内联样式上——改一个变量，两层主题都生效。
+ * 滑杆只管底栏 / 顶栏的填充，卡片、弹窗、按钮是不透明度固定的玻璃面。
  */
 
 const K_GLASS = 'liquid_glass'
@@ -32,7 +35,8 @@ function applyAlpha(alpha: number): void {
 }
 
 export const useGlass = create<GlassState>((set) => ({
-  glass: false,
+  // 首帧先按默认开画，load() 读完本地偏好再纠正（存过「关」的会关掉）
+  glass: true,
   alpha: GLASS_ALPHA_DEFAULT,
 
   load: async () => {
@@ -40,12 +44,14 @@ export const useGlass = create<GlassState>((set) => ({
       Preferences.get({ key: K_GLASS }),
       Preferences.get({ key: K_ALPHA }),
     ])
+    // value === null 是从来没存过：默认开；'1' 开、'0' 关
+    const glass = value === null ? true : value === '1'
     const alpha = Number(rawAlpha)
     if (Number.isFinite(alpha) && alpha >= GLASS_ALPHA_MIN && alpha <= GLASS_ALPHA_MAX) {
       applyAlpha(alpha)
-      set({ glass: value === '1', alpha })
+      set({ glass, alpha })
     } else {
-      set({ glass: value === '1' })
+      set({ glass })
     }
   },
 
