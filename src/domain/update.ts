@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
 
 /**
@@ -83,6 +84,8 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
 
 /** 自动检查的完整入口：开了开关 → 拉最新 release → 确实比本地新才返回 */
 export async function checkForUpdate(): Promise<ReleaseInfo | null> {
+  // iOS 分支：上游 Releases 只有 Android APK，在 iPhone 上提示更新会误导用户去下 APK，直接跳过
+  if (Capacitor.getPlatform() === 'ios') return null
   if (!(await isAutoCheckEnabled())) return null
   const release = await fetchLatestRelease()
   if (!release) return null
