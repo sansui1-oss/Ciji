@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { getCoveredWordsToday, markDayCoverageSkipped } from '@/data/article'
+import {
+  getCoveredWordsSince,
+  getCoveredWordsToday,
+  markDayCoverageSkipped,
+  markRangeCoverageSkipped,
+} from '@/data/article'
 import { getDay } from '@/data/store'
 import {
   defaultSelection,
   LEVELS,
   LEVEL_LABEL,
+  planCandidates,
   trimSelection,
   wordCandidates,
   KIND_LABEL,
@@ -15,8 +21,8 @@ import {
   type WordCandidate,
   type WordKind,
 } from '@/domain/article'
-import type { TodaySnapshot } from '@/domain/collect'
-import { monthDay } from '@/lib/date'
+import { collectAllPlan, type PlanSnapshot, type TodaySnapshot } from '@/domain/collect'
+import { dateKey, monthDay } from '@/lib/date'
 import { readGenDraft, saveGenDraft } from '@/store/ui'
 
 import styles from './GenerateArticle.module.css'
@@ -58,7 +64,36 @@ type Props = {
   onLimitChange: (limit: number) => void
 }
 
-const KINDS: WordKind[] = ['forget', 'vague', 'new']
+const KINDS: WordKind[] = ['forget', 'vague', 'new', 'pending', 'all']
+
+/** 真实类型（'all' 是全选快捷方式，不是一种词） */
+const REAL_KINDS: WordKind[] = ['forget', 'vague', 'new', 'pending']
+
+/** 最近 7 天 = 今天 + 往前 6 天（「全部单词」范围的已用口径） */
+function sevenDaysAgoKey(): string {
+  return dateKey(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000))
+}
+
+/** 候选词是否落在勾选的类型里；'all' 匹配全部候选词 */
+function matchesKinds(c: WordCandidate, kinds: WordKind[]): boolean {
+  return kinds.includes('all') || c.kinds.some((k) => kinds.includes(k))
+}
+
+/**
+ * 点一个类型后的下一组勾选：
+ * - 点「全部单词」：开 = 只留它一个，关 = 全空（再从空里逐个挑）
+ * - 点单个类型时先把 'all' 拿掉：从「全部」收窄到这个类型，
+ *   否则 'all' 还在会把刚取消的那个类型又匹配回来，按钮像坏了一样
+ * - 四个真实类型全勾上 = 全部，折叠成 ['all']，免得「全部」按钮该亮不亮
+ */
+function nextKindsAfterToggle(current: WordKind[], kind: WordKind): WordKind[] {
+  if (kind === 'all') {
+    return current.includes('all') ? [] : ['all']
+  }
+  const base = current.includes('all') ? [] : [...current]
+  const next = base.includes(kind) ? base.filter((k) => k !== kind) : [...base, kind]
+  return REAL_KINDS.every((k) => next.includes(k)) ? ['all'] : next
+}
 
 /**
  * 三步进度：只表示"走到哪一步"，不画百分比。
@@ -92,6 +127,9 @@ const KIND_COLOR: Record<WordKind, string> = {
   forget: 'var(--state-forget)',
   vague: 'var(--state-vague)',
   new: 'var(--state-new)',
+  pending: 'var(--state-pending)',
+  // 'all' 不是真实类型，不会出现在词条的 kinds 里，这里只是凑齐类型
+  all: 'var(--ink-3)',
 }
 
 export default function GenerateArticle({
@@ -112,9 +150,15 @@ export default function GenerateArticle({
   const restored = useRef(false)
 
   const [date, setDate] = useState(draft?.date ?? today)
+  /** 选词范围：'day' = 某一天的词，'all' = 计划内全部单词 */
+  const [scope, setScope] = useState<'day' | 'all'>(draft?.scope === 'all' ? 'all' : 'day')
   const [snapshot, setSnapshot] = useState<TodaySnapshot | null>(null)
+  /** 「全部单词」范围的计划快照；切回「今天」再切回来不用重新拉接口 */
+  const [plan, setPlan] = useState<PlanSnapshot | null>(null)
+  const planRef = useRef<PlanSnapshot | null>(null)
   const [usedWords, setUsedWords] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const [kinds, setKinds] = useState<WordKind[]>(() => {
     const saved = draft?.kinds.filter((k): k is WordKind => KINDS.includes(k as WordKind))
@@ -125,7 +169,8 @@ export default function GenerateArticle({
   const [limit, setLimit] = useState(initialLimit)
   const [level, setLevel] = useState<ArticleLevel>(initialLevel)
 
-  // 「清除当天已用记录」：两步确认 + 完成后重读数据
+  // 「清除已用记录」：两步确认 + 完成后重读数据。
+  // 按天范围清当天，全部范围清最近 7 天
   const [confirmClear, setConfirmClear] = useState(false)
   const [clearMsg, setClearMsg] = useState<string | null>(null)
   const [reloadTick, setReloadTick] = useState(0)
@@ -152,9 +197,16 @@ export default function GenerateArticle({
     }
     setConfirmClear(false)
     try {
-      const n = await markDayCoverageSkipped(date)
+      const n =
+        scope === 'all'
+          ? await markRangeCoverageSkipped(sevenDaysAgoKey())
+          : await markDayCoverageSkipped(date)
       setClearMsg(
-        n > 0 ? `已清除 ${n} 篇文章的已用标记，单词恢复可选` : '今天还没有需要清除的记录',
+        n > 0
+          ? `已清除 ${n} 篇文章的已用标记，单词恢复可选`
+          : scope === 'all'
+            ? '最近 7 天还没有需要清除的记录'
+            : '今天还没有需要清除的记录',
       )
     } catch (e) {
       setClearMsg(e instanceof Error ? e.message : '清除失败，请重试')
@@ -162,75 +214,96 @@ export default function GenerateArticle({
     setReloadTick((t) => t + 1)
   }
 
-  // 换日期：读那天的快照 + 那天已用过的词，然后按当前类型重算默认勾选
+  // 换范围 / 换日期：读候选词 + 已用过的词，然后按当前类型重算默认勾选。
+  // 按天读那天的快照；「全部单词」读计划内全部记录（走 planRef 缓存，切来切去不重复拉接口）
   useEffect(() => {
     let alive = true
     setLoading(true)
+    setLoadError(null)
 
     void (async () => {
-      const [snap, covered] = await Promise.all([getDay(date), getCoveredWordsToday(date)])
-      if (!alive) return
-      setSnapshot(snap)
-      setUsedWords(covered)
-
-      const cands = wordCandidates(snap, covered)
-      const fallback = new Set(defaultSelection(cands, KINDS))
-
-      // 第一次进来且有草稿：沿用草稿的勾选（只保留这天还在候选里的词）
-      if (!restored.current && draft?.selected?.length) {
-        const available = new Set(cands.map((c) => c.spelling.toLowerCase()))
-        const kept = new Set(draft.selected.filter((s) => available.has(s)))
-        if (kept.size > 0) {
-          restored.current = true
-          setSelected(kept)
-          setShowUsed(false)
-          setLoading(false)
-          return
+      try {
+        let cands: WordCandidate[]
+        if (scope === 'all') {
+          let snap = planRef.current
+          if (!snap) {
+            snap = await collectAllPlan()
+            planRef.current = snap
+          }
+          const covered = await getCoveredWordsSince(sevenDaysAgoKey())
+          if (!alive) return
+          setPlan(snap)
+          setUsedWords(covered)
+          cands = planCandidates(snap, covered)
+        } else {
+          const [snap, covered] = await Promise.all([getDay(date), getCoveredWordsToday(date)])
+          if (!alive) return
+          setSnapshot(snap)
+          setUsedWords(covered)
+          cands = wordCandidates(snap, covered)
         }
-      }
 
-      restored.current = true
-      setSelected(fallback)
-      setShowUsed(false)
-      setLoading(false)
+        const fallback = new Set(defaultSelection(cands, REAL_KINDS))
+
+        // 第一次进来且有草稿：沿用草稿的勾选（只保留当前范围还在候选里的词）
+        if (!restored.current && draft?.selected?.length) {
+          const available = new Set(cands.map((c) => c.spelling.toLowerCase()))
+          const kept = new Set(draft.selected.filter((s) => available.has(s)))
+          if (kept.size > 0) {
+            restored.current = true
+            setSelected(kept)
+            setShowUsed(false)
+            setLoading(false)
+            return
+          }
+        }
+
+        restored.current = true
+        setSelected(fallback)
+        setShowUsed(false)
+        setLoading(false)
+      } catch {
+        if (!alive) return
+        setLoadError('读取单词失败，请检查网络后重试')
+        setLoading(false)
+      }
     })()
 
     return () => {
       alive = false
     }
-  }, [date, draft, reloadTick])
+  }, [scope, date, draft, reloadTick])
 
-  // 勾选/类型/日期一变就记一笔，被杀之后还能接着来
+  // 勾选/类型/范围/日期一变就记一笔，被杀之后还能接着来
   useEffect(() => {
     if (loading) return
-    saveGenDraft({ date, kinds, selected: [...selected] })
-  }, [date, kinds, selected, loading])
+    saveGenDraft({ date, scope, kinds, selected: [...selected] })
+  }, [date, scope, kinds, selected, loading])
 
   const allCandidates = useMemo(
-    () => wordCandidates(snapshot, usedWords),
-    [snapshot, usedWords],
+    () =>
+      scope === 'all'
+        ? planCandidates(plan, usedWords)
+        : wordCandidates(snapshot, usedWords),
+    [scope, plan, snapshot, usedWords],
   )
 
-  // 类型变了：重算应该默认勾上/取消哪些（已用手动词保留）
+  // 类型变了：重算应该默认勾上/取消哪些（已用手动词保留）。
+  // 用「切换前后是否落在勾选类型里」来算，'all' 开关也一样：
+  // 刚勾上「全部单词」→ 所有未用词都补进选择；关掉它 → 只撤掉不落在任何剩余类型里的词
   function toggleKind(kind: WordKind) {
-    const nextKinds = kinds.includes(kind) ? kinds.filter((k) => k !== kind) : [...kinds, kind]
+    const nextKinds = nextKindsAfterToggle(kinds, kind)
     setKinds(nextKinds)
 
     setSelected((prev) => {
       const next = new Set(prev)
       for (const c of allCandidates) {
         const key = c.spelling.toLowerCase()
-        const match = c.kinds.includes(kind)
-        if (!match || c.used) continue
-        if (nextKinds.includes(kind)) {
-          // 刚勾上这个类型 → 补进选择
-          next.add(key)
-        } else if (!c.kinds.some((k) => nextKinds.includes(k))) {
-          // 刚取消 → 只撤掉「不落在任何剩余类型里」的词。
-          // 多重归属的词（比如既是忘记又是新学）只要还有别的类型勾着就保留——
-          // 否则「只看忘记」会把既是忘记又是新学的词全删光，明明 22 个忘记词只剩 1 个
-          next.delete(key)
-        }
+        if (c.used) continue
+        const was = matchesKinds(c, kinds)
+        const now = matchesKinds(c, nextKinds)
+        if (now && !was) next.add(key)
+        else if (!now && was) next.delete(key)
       }
       return next
     })
@@ -270,7 +343,8 @@ export default function GenerateArticle({
   async function handleGenerate() {
     const words = trimSelection(allCandidates, selected, limit)
     if (words.length === 0) return
-    await onGenerate({ date, words, kinds, level })
+    // 「全部单词」范围的文章就是今天生成的，日期记今天；kinds 照常传
+    await onGenerate({ date: scope === 'all' ? today : date, words, kinds, level })
   }
 
   return (
@@ -284,27 +358,46 @@ export default function GenerateArticle({
       <section className={styles.field}>
         <h2 className={styles.fieldLabel}>哪一天</h2>
         <div className={styles.days}>
+          <button
+            type="button"
+            className={styles.day}
+            data-on={scope === 'all'}
+            onClick={() => setScope('all')}
+          >
+            全部单词
+          </button>
           {days.map((d) => (
             <button
               key={d}
               type="button"
               className={styles.day}
-              data-on={d === date}
-              onClick={() => setDate(d)}
+              data-on={scope === 'day' && d === date}
+              onClick={() => {
+                setScope('day')
+                setDate(d)
+              }}
             >
               {d === today ? '今天' : monthDay(d)}
             </button>
           ))}
           {days.length === 0 && <p className={styles.hint}>还没有学习记录</p>}
         </div>
+        {scope === 'all' && (
+          <p className={styles.hint}>
+            计划内全部单词：墨墨接口不提供整本单词书，只能读到已加入学习计划的词。
+            {plan?.warning ? ` ${plan.warning}` : ''}
+          </p>
+        )}
       </section>
 
       <section className={styles.field}>
         <h2 className={styles.fieldLabel}>词的类型</h2>
         <div className={styles.kinds}>
           {KINDS.map((k) => {
-            const total = allCandidates.filter((c) => c.kinds.includes(k)).length
-            const unused = allCandidates.filter((c) => c.kinds.includes(k) && !c.used).length
+            // 'all' 匹配全部候选词（全选快捷方式）；其余按真实类型算
+            const match = (c: WordCandidate) => (k === 'all' ? true : c.kinds.includes(k))
+            const total = allCandidates.filter(match).length
+            const unused = allCandidates.filter((c) => match(c) && !c.used).length
             // 展示口径跟着开关走：打开「包含已用」→ 全量数；
             // 关着但还有词被藏起来 → 「未用/总数」，别让人以为词丢了
             const shown = showUsed || total === unused ? total : `${unused}/${total}`
@@ -325,13 +418,14 @@ export default function GenerateArticle({
         </div>
         <p className={styles.hint}>
           勾选决定默认用哪些词，下面还可以逐词调整。斜杠后是含已用词的总数；已用过的默认不出现，打开下面的开关再练。
+          {scope === 'day' ? '待学只在「全部单词」范围里有词。' : ''}
         </p>
       </section>
 
       {usedWords.size > 0 && (
         <label className={styles.switchRow}>
           <span className={styles.switchText}>
-            包含这天已经用过的词
+            {scope === 'all' ? '包含最近 7 天已经用过的词' : '包含这天已经用过的词'}
             <em>共 {usedWords.size} 个，打开后可以手动勾选，再练一次</em>
           </span>
           <input type="checkbox" className={styles.switch} checked={showUsed} onChange={toggleUsed} />
@@ -348,7 +442,9 @@ export default function GenerateArticle({
           >
             {confirmClear
               ? '确认清除？（单词会恢复默认可选）'
-              : '清除今天已生成文章的记录'}
+              : scope === 'all'
+                ? '清除最近 7 天已生成文章的记录'
+                : '清除今天已生成文章的记录'}
           </button>
           {clearMsg && <p className={styles.hint}>{clearMsg}</p>}
         </div>
@@ -398,7 +494,7 @@ export default function GenerateArticle({
         </div>
         {overLimit && (
           <p className={styles.warn}>
-            选了 {chosen.length} 个，超过上限 {limit}。按「忘记 → 模糊 → 新学」的顺序取前 {limit} 个。
+            选了 {chosen.length} 个，超过上限 {limit}。按「忘记 → 模糊 → 新学 → 待学」的顺序取前 {limit} 个。
           </p>
         )}
         {/* 词密度是真问题：340 词塞 15 个生僻词，平均每 22 词一个，比真题密得多，容易写成硬凑 */}
@@ -407,13 +503,23 @@ export default function GenerateArticle({
         </p>
       </section>
 
-      {loading && <p className={`${styles.hint} loading-pulse`}>正在读取这天的单词…</p>}
+      {loading && (
+        <p className={`${styles.hint} loading-pulse`}>
+          {scope === 'all' ? '正在读取计划里的单词…' : '正在读取这天的单词…'}
+        </p>
+      )}
+
+      {loadError && <p className={styles.error}>{loadError}</p>}
 
       {!loading && visible.length === 0 && (
         <p className={styles.hint}>
-          {usedWords.size > 0
-            ? '这天的词都用过了。打开上面的开关，可以挑几个再写一篇。'
-            : '这天没有符合条件的新学 / 模糊 / 忘记的词。换一天，或者去墨墨多背几个。'}
+          {scope === 'all'
+            ? usedWords.size > 0
+              ? '计划里的词最近 7 天都用过了。打开上面的开关，可以挑几个再写一篇。'
+              : '计划里没有符合条件的词。去墨墨多背几个，或者把词加进学习计划。'
+            : usedWords.size > 0
+              ? '这天的词都用过了。打开上面的开关，可以挑几个再写一篇。'
+              : '这天没有符合条件的新学 / 模糊 / 忘记的词。换一天，或者去墨墨多背几个。'}
         </p>
       )}
 

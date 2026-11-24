@@ -1,7 +1,7 @@
 import { chatCompletion, type CallUsage } from '@/api/llm'
 import { useLlm } from '@/store/llm'
 import { countWordsIn } from '@/lib/text'
-import type { TodaySnapshot } from '@/domain/collect'
+import type { PlanSnapshot, TodaySnapshot } from '@/domain/collect'
 import { distance, locateDefects, measure, type LocatedDefect } from '@/domain/generate/metrics'
 import { auditArticle } from '@/domain/generate/audit'
 import {
@@ -31,13 +31,20 @@ export { LEVEL_LABEL, GENRE_LABEL, pickGenre } from '@/domain/prompts'
 /** 新生成时可选的难度（雅思用不上，从选项里去掉） */
 export const LEVELS: ArticleLevel[] = ['cet4', 'cet6', 'kaoyan']
 
-/** 单词类型：与今天页的三组一一对应 */
-export type WordKind = 'forget' | 'vague' | 'new'
+/**
+ * 单词类型：忘记 / 模糊 / 新学与今天页的三组一一对应；
+ * 待学只在「全部单词」（计划内）范围里有词。
+ * 'all' 不是真实类型，是「全部单词」的全选快捷方式：它匹配全部候选词，
+ * 词条右侧显示的仍是它真实的类型，不显示「全部」。
+ */
+export type WordKind = 'forget' | 'vague' | 'new' | 'pending' | 'all'
 
 export const KIND_LABEL: Record<WordKind, string> = {
   forget: '忘记',
   vague: '模糊',
   new: '新学',
+  pending: '待学',
+  all: '全部单词',
 }
 
 export interface WordCandidate {
@@ -164,16 +171,66 @@ export function wordCandidates(
 }
 
 /**
+ * 取计划内（「全部单词」范围）的候选词。
+ *
+ * 和 wordCandidates 的区别只有来源与排序：计划内分组已经互斥
+ * （collect.classifyPlanRecord），一个词只属于待学 / 忘记 / 模糊 / 新学之一；
+ * 排序：忘记 > 模糊 > 新学 > 待学，同优先级按字母 —— 越容易忘的越值得再遇见一次，
+ * 待学排最后（还没学过的词先在文章里露个脸即可）。
+ */
+export function planCandidates(
+  plan: PlanSnapshot | null,
+  used: Set<string>,
+): WordCandidate[] {
+  if (!plan) return []
+
+  const map = new Map<string, WordCandidate>()
+
+  for (const w of plan.words) {
+    const spelling = w.spelling.trim()
+    if (!spelling) continue
+    // 计划内分组已经互斥：一个词只有一个 kind；'all' 不是真实类型，不会出现在 kinds 里
+    const kinds: WordKind[] = [w.kind]
+
+    const key = spelling.toLowerCase()
+    const prev = map.get(key)
+    if (prev) {
+      for (const k of kinds) if (!prev.kinds.includes(k)) prev.kinds.push(k)
+      continue
+    }
+    map.set(key, { spelling, kinds, used: used.has(key) })
+  }
+
+  const rank = (c: WordCandidate) =>
+    c.kinds.includes('forget')
+      ? 0
+      : c.kinds.includes('vague')
+        ? 1
+        : c.kinds.includes('new')
+          ? 2
+          : 3
+
+  return [...map.values()].sort(
+    (a, b) => rank(a) - rank(b) || a.spelling.localeCompare(b.spelling),
+  )
+}
+
+/**
  * 按勾选的类型算出「默认该选哪些词」。
  * 当天已用过的词默认排除 —— 想再用一次得自己手动勾。
+ * 'all' 是全选快捷方式：勾上它就匹配全部候选词（不看各自的类型）。
  */
 export function defaultSelection(cands: WordCandidate[], kinds: WordKind[]): string[] {
+  const matchAll = kinds.includes('all')
   return cands
-    .filter((c) => !c.used && c.kinds.some((k) => kinds.includes(k)))
+    .filter((c) => !c.used && (matchAll || c.kinds.some((k) => kinds.includes(k))))
     .map((c) => c.spelling.toLowerCase())
 }
 
-/** 勾选过多时按「忘记 > 模糊 > 新学」保留前 limit 个 */
+/**
+ * 勾选过多时按「忘记 > 模糊 > 新学 > 待学」保留前 limit 个。
+ * 'all' 不是真实类型，不参与排序：候选词已经按各自真实类型排好序。
+ */
 export function trimSelection(
   cands: WordCandidate[],
   selected: Set<string>,

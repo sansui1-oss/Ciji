@@ -107,6 +107,8 @@ export function clearReadPos(articleId: string): void {
 
 export type GenDraft = {
   date: string
+  /** 选词范围：'day' = 按天选词；'all' = 计划内全部单词。老草稿没有这个字段，按 'day' 处理 */
+  scope?: 'day' | 'all'
   kinds: string[]
   selected: string[]
   savedAt: number

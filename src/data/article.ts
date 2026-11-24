@@ -242,6 +242,19 @@ export async function clearArticles(): Promise<number> {
   return index.length
 }
 
+/** 把一批文章的目标词收进已用集合（跳过被标记「不计入已用」的文章） */
+async function collectCovered(ids: string[]): Promise<Set<string>> {
+  const covered = new Set<string>()
+  for (const id of ids) {
+    const a = await getArticleById(id)
+    if (!a) continue
+    // 用户在生成页点了「清除已用记录」的文章不算覆盖，那些词恢复默认可选
+    if (a.skipCoverage) continue
+    for (const w of a.targetWords) covered.add(w.toLowerCase())
+  }
+  return covered
+}
+
 /**
  * 今天已经生成过的文章覆盖了哪些词。
  * 生成新文章时排除这些词，避免同一天反复用同一批；
@@ -250,16 +263,30 @@ export async function clearArticles(): Promise<number> {
 export async function getCoveredWordsToday(date: string): Promise<Set<string>> {
   const index = await readIndex()
   const ids = index.filter((a) => a.date === date).map((a) => a.id)
+  return collectCovered(ids)
+}
 
-  const covered = new Set<string>()
+/**
+ * 从某天起（含当天）生成过的文章覆盖了哪些词。
+ * 「全部单词」范围的已用口径：最近 7 天内生成的文章覆盖过的词。
+ * 日期键是 YYYY-MM-DD，字典序比较就是日期比较。
+ */
+export async function getCoveredWordsSince(startDate: string): Promise<Set<string>> {
+  const index = await readIndex()
+  const ids = index.filter((a) => a.date >= startDate).map((a) => a.id)
+  return collectCovered(ids)
+}
+
+/** 把一批文章标记为「不计入已用」，返回实际标记了几篇 */
+async function markCoverageSkipped(ids: string[]): Promise<number> {
+  let marked = 0
   for (const id of ids) {
     const a = await getArticleById(id)
-    if (!a) continue
-    // 用户在生成页点了「清除当天已用记录」的文章不算覆盖，那些词恢复默认可选
-    if (a.skipCoverage) continue
-    for (const w of a.targetWords) covered.add(w.toLowerCase())
+    if (!a || a.skipCoverage) continue
+    await saveArticle({ ...a, skipCoverage: true })
+    marked += 1
   }
-  return covered
+  return marked
 }
 
 /**
@@ -269,15 +296,17 @@ export async function getCoveredWordsToday(date: string): Promise<Set<string>> {
 export async function markDayCoverageSkipped(date: string): Promise<number> {
   const index = await readIndex()
   const ids = index.filter((a) => a.date === date).map((a) => a.id)
+  return markCoverageSkipped(ids)
+}
 
-  let marked = 0
-  for (const id of ids) {
-    const a = await getArticleById(id)
-    if (!a || a.skipCoverage) continue
-    await saveArticle({ ...a, skipCoverage: true })
-    marked += 1
-  }
-  return marked
+/**
+ * 把从某天起（含当天）所有文章标记为「不计入已用」
+ * （生成页「全部单词」范围的「清除最近 7 天已生成文章的记录」按钮）。
+ */
+export async function markRangeCoverageSkipped(startDate: string): Promise<number> {
+  const index = await readIndex()
+  const ids = index.filter((a) => a.date >= startDate).map((a) => a.id)
+  return markCoverageSkipped(ids)
 }
 
 /** 某天最后一篇，用于打开阅读页时默认展示 */

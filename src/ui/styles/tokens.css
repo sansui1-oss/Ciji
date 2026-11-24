@@ -19,6 +19,8 @@
   --state-new: #2a5580;
   --state-vague: #8f5f1c;
   --state-forget: #9c332a;
+  /* 待学：灰绿色，和上面三支笔都不撞 */
+  --state-pending: #5b7a68;
 
   /* 交互 */
   --accent: #16181a;
@@ -119,6 +121,7 @@
   --state-new: #7ea6cc;
   --state-vague: #c99a52;
   --state-forget: #d07066;
+  --state-pending: #8fb0a0;
 
   --accent: #eceee9;
   --on-accent: #121413;

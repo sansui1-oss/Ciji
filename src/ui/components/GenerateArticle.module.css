@@ -86,8 +86,10 @@
 
 /* ── 类型复选框 ───────────────────────── */
 
+/* 五个类型（多了「待学」「全部单词」）放不下一行，允许换行；标签不折行 */
 .kinds {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -102,6 +104,7 @@
   border-radius: 2px;
   font-size: var(--fs-sm);
   color: var(--ink-2);
+  white-space: nowrap;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
