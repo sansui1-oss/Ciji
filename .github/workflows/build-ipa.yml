@@ -1,1 +1,96 @@
+name: Build Ciji IPA (iOS)
 
+# 词迹 iOS 版打包：上游 laaa27/Ciji 只有 Android 工程，
+# 这个 fork 在 master 上加了 @capacitor/ios，工作流在 macOS 上
+# 现场生成 iOS 工程并打出未签名 IPA（需用 SideStore / AltStore 重签名安装）。
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ciji-ios-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web assets
+        run: npm run build
+
+      - name: Add iOS platform
+        # 仓库里不提交 ios/ 目录（里面有二进制图标），每次在 runner 上现生成
+        run: npx cap add ios
+
+      - name: Sync iOS project
+        run: npx cap sync ios
+
+      - name: Resolve Swift packages
+        run: |
+          xcodebuild -resolvePackageDependencies -project ios/App/App.xcodeproj
+
+      - name: Show Xcode configuration
+        run: |
+          xcodebuild -version
+          xcodebuild -list -project ios/App/App.xcodeproj
+
+      - name: Build iOS app (unsigned)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -target App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$PWD/build/DerivedData" \
+            MARKETING_VERSION="0.24.1" \
+            CURRENT_PROJECT_VERSION="98" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            build 2>&1 | tee build/xcodebuild.log
+
+      - name: Validate bundle and pack IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_PATH="$PWD/build/DerivedData/Build/Products/Release-iphoneos/App.app"
+          test -f "$APP_PATH/Info.plist"
+          test -f "$APP_PATH/App"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist")" = "com.laaa27.maimemo"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_PATH/Info.plist")" = "0.24.1"
+          mkdir -p build/package/Payload
+          ditto "$APP_PATH" build/package/Payload/App.app
+          (cd build/package && /usr/bin/zip -qry ../Ciji-0.24.1.ipa Payload)
+          (cd build && shasum -a 256 Ciji-0.24.1.ipa > Ciji-0.24.1.ipa.sha256)
+          ls -lh build/Ciji-0.24.1.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ciji-0.24.1-ipa
+          path: |
+            build/Ciji-0.24.1.ipa
+            build/Ciji-0.24.1.ipa.sha256
+            build/xcodebuild.log
+          if-no-files-found: error
