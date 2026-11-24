@@ -3,6 +3,7 @@ name: Build Ciji IPA (iOS)
 # 词迹 iOS 版打包：上游 laaa27/Ciji 只有 Android 工程，
 # 这个 fork 在 master 上加了 @capacitor/ios，工作流在 macOS 上
 # 现场生成 iOS 工程并打出未签名 IPA（需用 SideStore / AltStore 重签名安装）。
+# 训练题库在打包时现场从上游官方 APK 抽取，仅供仓库主人自己用，不入库、不发 Release。
 on:
   push:
     branches: [master]
@@ -31,6 +32,24 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Extract training data from upstream APK (personal use only)
+        # 训练题库不在仓库里（作者有意不入库，见 README“已知限制”）。
+        # 这里只在 runner 内存里从上游官方 APK 抽出 public/training/，
+        # 绝不提交进仓库、不发 Release，IPA 只在 Actions 产物里给仓库主人自己下载。
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L -o /tmp/ciji.apk https://github.com/laaa27/Ciji/releases/download/v0.24.1/ciji-v0.24.1.apk
+          echo "23312d98bed0e8a6d46b1c10c9e5e754584b82b986cc2290b052437aeed5fb6d  /tmp/ciji.apk" | shasum -a 256 -c -
+          mkdir -p /tmp/ciji-apk public/training
+          unzip -o -q /tmp/ciji.apk 'assets/public/training/*' -d /tmp/ciji-apk
+          cp -r /tmp/ciji-apk/assets/public/training/* public/training/
+          rm -f /tmp/ciji.apk
+          rm -rf /tmp/ciji-apk
+          test -f public/training/index.json
+          echo "Training papers: $(ls public/training/p/*.json | wc -l)"
+          python3 -c "import json; print('index papers:', len(json.load(open('public/training/index.json'))['papers']))"
 
       - name: Build web assets
         run: npm run build
